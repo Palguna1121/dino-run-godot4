@@ -39,7 +39,17 @@ func _ready() -> void:
 	randomize()  # Initialize random seed
 	screen_size = get_window().size
 	ground_height = $ground.get_node("Sprite2D").texture.get_height()
+	$controller_btn.hide()
 	$game_over.get_node("restart_btn").pressed.connect(new_game)
+	
+	# Tambahkan area untuk tap
+	var tap_area = Control.new()
+	tap_area.set_anchors_preset(Control.PRESET_FULL_RECT)  # Mengisi seluruh layar
+	tap_area.mouse_filter = Control.MOUSE_FILTER_STOP  # Menangkap input mouse
+	tap_area.name = "tap_area"
+	tap_area.gui_input.connect(_on_tap_area_input)
+	add_child(tap_area)
+	
 	new_game()
 
 func new_game() -> void:
@@ -73,35 +83,25 @@ func _process(delta: float) -> void:
 		update_game_state(delta)
 		clean_up_obstacles()
 		check_obstacle_generation()
+		$controller_btn.show()
+		if is_instance_valid($tap_area):
+			$tap_area.queue_free()  # Hapus tap area saat game sudah running
 	else:
 		if Input.is_action_just_pressed("ui_accept"):
-			game_running = true
-			$custom_hud.get_node("tap_start_label").hide()
+			start_game()
 
-#func _process(delta: float) -> void:
-	#if game_running:
-		#speed = START_SPEED + score / SPEED_MODIFIER
-		#if speed >= MAX_SPEED:
-			#speed = MAX_SPEED
-		#adjust_diff()
-		#generate_obs()
-		#
-		#$dino.position.x += speed
-		#$Camera2D.position.x += speed
-		#score += speed / FIX_SCORE
-		#show_score()
-		#
-		#if $Camera2D.position.x - $ground.position.x > screen_size.x * 1.5:
-			#$ground.position.x += screen_size.x
-			#
-		#for obs in obstacles:
-			#if obs.position.x < ($Camera2D.position.x - screen_size.x):
-				#remove_obs(obs)
-			#
-	#else:
-		#if Input.is_action_just_pressed("ui_accept"):
-			#game_running = true
-			#$custom_hud.get_node("tap_start_label").hide()
+func _on_tap_area_input(event: InputEvent) -> void:
+	if not game_running:
+		if event is InputEventMouseButton:
+			if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+				start_game()
+		elif event is InputEventScreenTouch:
+			if event.pressed:
+				start_game()
+
+func start_game() -> void:
+	game_running = true
+	$custom_hud.get_node("tap_start_label").hide()
 
 func update_game_state(delta: float) -> void:
 	# Update speed based on score
@@ -187,10 +187,11 @@ func show_score() -> void:
 func check_high_score() -> void:
 	if int(score) > high_score:
 		high_score = int(score)
-		$custom_hud.get_node("high_score_label").text = "High Score: " + str(high_score / SCORE_MODIFIER)
+		$custom_hud.get_node("high_score_label").text = "High Score: " + str(high_score)
 
 func game_over() -> void:
 	check_high_score()
 	get_tree().paused = true
 	game_running = false
+	$controller_btn.hide()
 	$game_over.show()

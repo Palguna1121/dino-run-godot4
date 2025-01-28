@@ -1,4 +1,4 @@
-[gd_scene load_steps=7 format=3 uid="uid://cxcxt2roftxrl"]
+[gd_scene load_steps=8 format=3 uid="uid://cxcxt2roftxrl"]
 
 [ext_resource type="PackedScene" uid="uid://ksxgwdapax82" path="res://scenes/bg.tscn" id="1_bq2x8"]
 [ext_resource type="Script" path="res://scripts/main.gd" id="1_edxsg"]
@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" uid="uid://cpxa4f84e12rm" path="res://scenes/dino.tscn" id="3_cnrde"]
 [ext_resource type="PackedScene" uid="uid://bwg8tyffrktm" path="res://scenes/custom_hud.tscn" id="5_f1xrb"]
 [ext_resource type="PackedScene" uid="uid://bic8ia7mv6x5" path="res://scenes/game_over.tscn" id="6_xk70e"]
+[ext_resource type="PackedScene" uid="uid://bwqxrt7380b4g" path="res://scenes/controller_btn.tscn" id="7_gbcxa"]
 
 [node name="main" type="Node"]
 script = ExtResource("1_edxsg")
@@ -24,3 +25,5 @@ position = Vector2(576, 324)
 
 [node name="game_over" parent="." instance=ExtResource("6_xk70e")]
 process_mode = 2
+
+[node name="controller_btn" parent="." instance=ExtResource("7_gbcxa")]
