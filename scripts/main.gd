@@ -12,8 +12,8 @@ var obstacles: Array[Node] = []  # Explicitly type the array
 var bird_heights := [200, 390]
 
 # Game constants
-const GAME_WIDTH := 1152  # Sesuaikan dengan size Camera2D.x
-const GAME_HEIGHT := 648  # Sesuaikan dengan size Camera2D.y
+const GAME_WIDTH := 1152  # Base game width
+const GAME_HEIGHT := 648  # Base game height
 const DINO_START_POS := Vector2(150, 485)
 const CAM_START_POS := Vector2(576, 324)
 const MAX_DIFFICULTY := 3
@@ -24,12 +24,12 @@ const MAX_SPEED := 25.0
 const SPEED_MODIFIER := 5000
 const MIN_OBSTACLE_DISTANCE := 300
 const MAX_OBSTACLE_DISTANCE := 500
-const OBSTACLE_CLEANUP_MARGIN := 1000  # Distance before camera to clean up obstacles
+const OBSTACLE_CLEANUP_MARGIN := 1000
 
 # Game variables
 var difficulty := 0
 var high_score := 0
-var score := 0.0  # Changed to float for smoother increments
+var score := 0.0
 var speed := START_SPEED
 var screen_size: Vector2
 var ground_height: int
@@ -39,17 +39,51 @@ var next_obstacle_distance := 0.0
 var is_restarting := false
 
 func _ready() -> void:
-	# Set up viewport and window
-	get_tree().root.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
-	get_tree().root.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
+	# Setup window and viewport for both web and standalone
+	var root = get_tree().root
+	var window = get_window()
 	
-	get_window().size = Vector2i(GAME_WIDTH, GAME_HEIGHT)
-	get_window().min_size = Vector2i(GAME_WIDTH, GAME_HEIGHT)
+	# Set basic content scaling mode
+	root.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+	root.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
 	
-	get_viewport().size = Vector2i(GAME_WIDTH, GAME_HEIGHT)
-	get_viewport().content_scale_size = Vector2i(GAME_WIDTH, GAME_HEIGHT)
+	# Set up viewport size
+	get_viewport().set_content_scale_size(Vector2i(GAME_WIDTH, GAME_HEIGHT))
 	
-	# Set up game
+	# Handle window settings
+	if OS.has_feature("web"):
+		# Web-specific setup
+		window.mode = Window.MODE_WINDOWED
+		window.min_size = Vector2i(GAME_WIDTH, GAME_HEIGHT)
+		
+		# Center the viewport content
+		root.set_content_scale_mode(Window.CONTENT_SCALE_MODE_CANVAS_ITEMS)
+		root.set_content_scale_aspect(Window.CONTENT_SCALE_ASPECT_KEEP)
+		
+		# Add canvas layer for centering if needed
+		if not has_node("CenterContainer"):
+			var center_container = CenterContainer.new()
+			center_container.name = "CenterContainer"
+			center_container.set_anchors_preset(Control.PRESET_FULL_RECT)
+			add_child(center_container)
+			
+			# Move game content to center container if needed
+			# Note: Adjust this based on your scene structure
+			if has_node("game_content"):
+				var game_content = get_node("game_content")
+				remove_child(game_content)
+				center_container.add_child(game_content)
+		
+		# Connect to window resize
+		get_window().size_changed.connect(_on_window_resize)
+		# Initial window resize handling
+		_on_window_resize()
+	else:
+		# Standalone-specific setup
+		window.size = Vector2i(GAME_WIDTH, GAME_HEIGHT)
+		window.min_size = Vector2i(GAME_WIDTH, GAME_HEIGHT)
+	
+	# Common setup continues...
 	randomize()
 	screen_size = Vector2(GAME_WIDTH, GAME_HEIGHT)
 	ground_height = $ground.get_node("Sprite2D").texture.get_height()
@@ -59,6 +93,27 @@ func _ready() -> void:
 	create_tap_area()
 	new_game()
 
+func _on_window_resize() -> void:
+	if OS.has_feature("web"):
+		var window = get_window()
+		var viewport = get_viewport()
+		var window_size = window.size
+		
+		# Calculate scale to fit window while maintaining aspect ratio
+		var scale_x = window_size.x / float(GAME_WIDTH)
+		var scale_y = window_size.y / float(GAME_HEIGHT)
+		var scale = min(scale_x, scale_y)
+		
+		# Calculate centered position
+		var margin_x = (window_size.x - (GAME_WIDTH * scale)) / 2
+		var margin_y = (window_size.y - (GAME_HEIGHT * scale)) / 2
+		
+		# Apply centering via viewport canvas transform
+		var transform = Transform2D()
+		transform = transform.scaled(Vector2(scale, scale))
+		transform = transform.translated(Vector2(margin_x/scale, margin_y/scale))
+		viewport.canvas_transform = transform
+		
 func create_tap_area() -> void:
 	if not has_node("tap_area"):
 		var tap_area = Control.new()
