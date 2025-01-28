@@ -95,7 +95,7 @@ animations = [{
 }],
 "loop": true,
 "name": &"duck",
-"speed": 5.0
+"speed": 10.0
 }, {
 "frames": [{
 "duration": 1.0,
@@ -162,7 +162,7 @@ script = ExtResource("1_divof")
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
 texture_filter = 1
 sprite_frames = SubResource("SpriteFrames_vkbbe")
-animation = &"duck"
+animation = &"idle"
 autoplay = "idle"
 
 [node name="run_coll" type="CollisionShape2D" parent="."]

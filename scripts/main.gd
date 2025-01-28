@@ -12,6 +12,8 @@ var obstacles: Array[Node] = []  # Explicitly type the array
 var bird_heights := [200, 390]
 
 # Game constants
+const GAME_WIDTH := 1152  # Sesuaikan dengan size Camera2D.x
+const GAME_HEIGHT := 648  # Sesuaikan dengan size Camera2D.y
 const DINO_START_POS := Vector2(150, 485)
 const CAM_START_POS := Vector2(576, 324)
 const MAX_DIFFICULTY := 3
@@ -34,74 +36,114 @@ var ground_height: int
 var game_running := false
 var last_obstacle_position := 0.0
 var next_obstacle_distance := 0.0
+var is_restarting := false
 
 func _ready() -> void:
-	randomize()  # Initialize random seed
-	screen_size = get_window().size
+	# Set up viewport and window
+	get_tree().root.content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+	get_tree().root.content_scale_aspect = Window.CONTENT_SCALE_ASPECT_KEEP
+	
+	get_window().size = Vector2i(GAME_WIDTH, GAME_HEIGHT)
+	get_window().min_size = Vector2i(GAME_WIDTH, GAME_HEIGHT)
+	
+	get_viewport().size = Vector2i(GAME_WIDTH, GAME_HEIGHT)
+	get_viewport().content_scale_size = Vector2i(GAME_WIDTH, GAME_HEIGHT)
+	
+	# Set up game
+	randomize()
+	screen_size = Vector2(GAME_WIDTH, GAME_HEIGHT)
 	ground_height = $ground.get_node("Sprite2D").texture.get_height()
 	$controller_btn.hide()
-	$game_over.get_node("restart_btn").pressed.connect(new_game)
+	$game_over.get_node("restart_btn").pressed.connect(restart_game)
 	
-	# Tambahkan area untuk tap
-	var tap_area = Control.new()
-	tap_area.set_anchors_preset(Control.PRESET_FULL_RECT)  # Mengisi seluruh layar
-	tap_area.mouse_filter = Control.MOUSE_FILTER_STOP  # Menangkap input mouse
-	tap_area.name = "tap_area"
-	tap_area.gui_input.connect(_on_tap_area_input)
-	add_child(tap_area)
-	
+	create_tap_area()
 	new_game()
 
+func create_tap_area() -> void:
+	if not has_node("tap_area"):
+		var tap_area = Control.new()
+		tap_area.set_anchors_preset(Control.PRESET_FULL_RECT)
+		tap_area.mouse_filter = Control.MOUSE_FILTER_STOP
+		tap_area.name = "tap_area"
+		tap_area.gui_input.connect(_on_tap_area_input)
+		add_child(tap_area)
+
 func new_game() -> void:
+	# Reset game state
+	is_restarting = true
+	get_tree().paused = false
+	
+	# Reset game variables
 	score = 0.0
 	speed = START_SPEED
 	difficulty = 0
 	game_running = false
-	get_tree().paused = false
 	last_obstacle_position = 0.0
 	next_obstacle_distance = randi_range(MIN_OBSTACLE_DISTANCE, MAX_OBSTACLE_DISTANCE)
 	
-	# Clean up existing obstacles
-	for obs in obstacles:
-		if is_instance_valid(obs):  # Check if obstacle still exists
-			obs.queue_free()
-	obstacles.clear()
+	# Clean up existing obstacles with safety check
+	clean_up_all_obstacles()
 	
-	# Reset positions
-	$dino.position = DINO_START_POS
-	$dino.velocity = Vector2.ZERO
-	$Camera2D.position = CAM_START_POS
-	$ground.position = Vector2.ZERO
+	# Reset physics state and position with safety delay
+	await get_tree().physics_frame
+	reset_game_positions()
 	
 	# Reset UI
 	show_score()
 	$custom_hud.get_node("tap_start_label").show()
 	$game_over.hide()
+	$controller_btn.hide()
+	
+	create_tap_area()
+	is_restarting = false
+
+func restart_game() -> void:
+	if is_restarting:
+		return  # Prevent multiple restarts
+	
+	# Ensure we're not in paused state
+	get_tree().paused = false
+	
+	# Wait for physics frame to ensure clean state
+	await get_tree().physics_frame
+	new_game()
+	
+	# Wait another physics frame before starting
+	await get_tree().physics_frame
+	start_game()
 
 func _process(delta: float) -> void:
+	if is_restarting:
+		return
+		
 	if game_running:
 		update_game_state(delta)
 		clean_up_obstacles()
 		check_obstacle_generation()
 		$controller_btn.show()
-		if is_instance_valid($tap_area):
-			$tap_area.queue_free()  # Hapus tap area saat game sudah running
+		if has_node("tap_area"):
+			$tap_area.queue_free()
 	else:
-		if Input.is_action_just_pressed("ui_accept"):
+		if Input.is_action_just_pressed("ui_accept") and not is_restarting:
 			start_game()
 
+func start_game() -> void:
+	if is_restarting:
+		return
+		
+	game_running = true
+	$custom_hud.get_node("tap_start_label").hide()
+	if has_node("tap_area"):
+		$tap_area.queue_free()
+
 func _on_tap_area_input(event: InputEvent) -> void:
-	if not game_running:
+	if not game_running and not is_restarting:
 		if event is InputEventMouseButton:
 			if event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 				start_game()
 		elif event is InputEventScreenTouch:
 			if event.pressed:
 				start_game()
-
-func start_game() -> void:
-	game_running = true
-	$custom_hud.get_node("tap_start_label").hide()
 
 func update_game_state(delta: float) -> void:
 	# Update speed based on score
@@ -155,11 +197,12 @@ func generate_obstacles() -> void:
 		add_obstacle(bird, bird_x, bird_y)
 
 func add_obstacle(obs: Node, x: float, y: float) -> void:
-	if not is_instance_valid(obs):
+	if not is_instance_valid(obs) or is_restarting:
 		return
 		
 	obs.position = Vector2(x, y)
-	obs.body_entered.connect(hit_obs)
+	if not obs.body_entered.is_connected(hit_obs):
+		obs.body_entered.connect(hit_obs)
 	add_child(obs)
 	obstacles.append(obs)
 
@@ -174,11 +217,29 @@ func clean_up_obstacles() -> void:
 			obs.queue_free()
 		i -= 1
 
+func clean_up_all_obstacles() -> void:
+	for obs in obstacles:
+		if is_instance_valid(obs):
+			obs.body_entered.disconnect(hit_obs)  # Disconnect signal first
+			obs.queue_free()
+	obstacles.clear()
+
+func reset_game_positions() -> void:
+	if is_instance_valid($dino):
+		$dino.position = DINO_START_POS
+		$dino.velocity = Vector2.ZERO
+		# Reset any dino-specific states if needed
+		if $dino.has_method("reset_state"):
+			$dino.reset_state()
+	
+	$Camera2D.position = CAM_START_POS
+	$ground.position = Vector2.ZERO
+
 func adjust_difficulty() -> void:
 	difficulty = mini(int(score / SPEED_MODIFIER), MAX_DIFFICULTY)
 
 func hit_obs(body: Node) -> void:
-	if body.name == "dino" and game_running:
+	if body.name == "dino" and game_running and not is_restarting:
 		game_over()
 
 func show_score() -> void:
@@ -190,8 +251,11 @@ func check_high_score() -> void:
 		$custom_hud.get_node("high_score_label").text = "High Score: " + str(high_score)
 
 func game_over() -> void:
+	if is_restarting:
+		return
+		
 	check_high_score()
-	get_tree().paused = true
 	game_running = false
 	$controller_btn.hide()
 	$game_over.show()
+	get_tree().paused = true

@@ -34,7 +34,11 @@ func _physics_process(delta: float) -> void:
 func handle_floor_state() -> void:
 	if Input.is_action_just_pressed("ui_accept") and can_jump:
 		jump()
-	elif Input.is_action_pressed("ui_down") or is_crouching:
+	elif Input.is_action_pressed("ui_down"):
+		$AnimatedSprite2D.play("duck")
+		$run_coll.disabled = true
+		$duck_coll.disabled = false
+	elif is_crouching:
 		crouch()
 	else:
 		stand()
@@ -57,6 +61,7 @@ func stand() -> void:
 	$run_coll.disabled = false
 	$duck_coll.disabled = true
 
+# Button signal handlers
 func _on_jump_btn_down() -> void:
 	if is_on_floor() and can_jump:
 		jump()
