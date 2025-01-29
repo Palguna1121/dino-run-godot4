@@ -1,11 +1,9 @@
 extends Area2D
 
+var bird_speed: float = 5.0  # Kecepatan default burung
 
-# Called when the node enters the scene tree for the first time.
-func _ready() -> void:
-	pass # Replace with function body.
+func set_speed(new_speed: float) -> void:
+	bird_speed = min(new_speed, 10.0)  # Batasi kecepatan maksimal burung
 
-
-# Called every frame. 'delta' is the elapsed time since the previous frame.
 func _process(delta: float) -> void:
-	position.x -= get_parent().speed / 2
+	position.x -= bird_speed  # Gunakan kecepatan burung yang sudah diatur

@@ -1,6 +1,7 @@
-[gd_scene load_steps=5 format=3 uid="uid://bic8ia7mv6x5"]
+[gd_scene load_steps=6 format=3 uid="uid://bic8ia7mv6x5"]
 
 [ext_resource type="FontFile" uid="uid://s15272omc2m3" path="res://assets/fonts/retro.ttf" id="1_tp87q"]
+[ext_resource type="AudioStream" uid="uid://drc1nk5iaoig8" path="res://assets/sound/game_over.wav" id="2_0u5kp"]
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_j60fg"]
 bg_color = Color(0.125911, 0.316383, 0.277229, 1)
@@ -46,3 +47,7 @@ grow_horizontal = 2
 theme_override_fonts/font = ExtResource("1_tp87q")
 theme_override_font_sizes/font_size = 80
 text = "GAME OVER!!!"
+
+[node name="game_over_sound" type="AudioStreamPlayer" parent="."]
+stream = ExtResource("2_0u5kp")
+volume_db = -24.0

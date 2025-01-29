@@ -5,6 +5,7 @@ var stump_scene = preload("res://scenes/stump.tscn")
 var rock_scene = preload("res://scenes/rock.tscn")
 var barrel_scene = preload("res://scenes/barrel.tscn")
 var bird_scene = preload("res://scenes/bird.tscn")
+var game_over_scene = preload("res://scenes/game_over.tscn")
 
 # Obstacle configuration
 var obstacle_types := [stump_scene, rock_scene, barrel_scene]
@@ -22,9 +23,11 @@ const FIX_SCORE := 10.0
 const START_SPEED := 10.0
 const MAX_SPEED := 25.0
 const SPEED_MODIFIER := 5000
-const MIN_OBSTACLE_DISTANCE := 300
-const MAX_OBSTACLE_DISTANCE := 500
+const MIN_OBSTACLE_DISTANCE := 350
+const MAX_OBSTACLE_DISTANCE := 550
 const OBSTACLE_CLEANUP_MARGIN := 1000
+const BIRD_SPEED := 0.1  # Kecepatan dasar burung
+const BIRD_SPEED_MODIFIER := 0.1  # Modifier kecepatan burung berdasarkan difficulty
 
 # Game variables
 var difficulty := 0
@@ -204,6 +207,10 @@ func update_game_state(delta: float) -> void:
 	# Update speed based on score
 	speed = min(START_SPEED + score / SPEED_MODIFIER, MAX_SPEED)
 	
+	# Tambahkan kecepatan ekstra jika mencapai tingkat kesulitan maksimum
+	if difficulty == MAX_DIFFICULTY:
+		speed += 5.0  # Atau nilai tambahan kecepatan yang Anda inginkan
+	
 	# Update positions
 	$dino.position.x += speed * delta * 60  # Make movement frame-rate independent
 	$Camera2D.position.x += speed * delta * 60
@@ -211,6 +218,11 @@ func update_game_state(delta: float) -> void:
 	# Update score
 	score += speed * delta * (60.0 / FIX_SCORE)  # Smooth score increment
 	show_score()
+	
+	if $Camera2D.position.x - $ground.position.x > screen_size.x * 1.5:
+		$ground.position.x += screen_size.x
+	
+	adjust_difficulty()
 	
 	# Update ground
 	if $Camera2D.position.x - $ground.position.x > screen_size.x * 1.5:
@@ -227,29 +239,39 @@ func check_obstacle_generation() -> void:
 func generate_obstacles() -> void:
 	var base_x = $Camera2D.position.x + screen_size.x + 350
 	
-	# Generate ground obstacles
-	var obs_type = obstacle_types[randi() % obstacle_types.size()]
-	var max_obs = difficulty + 1
-	var obs_count = randi() % max_obs + 1
-	
-	for i in range(obs_count):
-		var obs = obs_type.instantiate()
-		var obs_sprite = obs.get_node("Sprite2D")
-		var obs_height = obs_sprite.texture.get_height()
-		var obs_scale = obs_sprite.scale
-		
-		var obs_x = base_x + (i * 100)
-		var obs_y = screen_size.y - ground_height - (obs_height * obs_scale.y / 2) + 5
-		
-		add_obstacle(obs, obs_x, obs_y)
-		last_obstacle_position = obs_x
-	
-	# Generate bird with increasing probability based on difficulty
+	# Tentukan apakah akan muncul bird atau obstacle lainnya
+	var spawn_bird = false
 	if difficulty >= 1 and randf() < 0.3 + (difficulty * 0.1):
+		spawn_bird = true
+	
+	if spawn_bird:
+		# Hanya munculkan bird
 		var bird = bird_scene.instantiate()
 		var bird_x = base_x + randi_range(0, 200)
 		var bird_y = bird_heights[randi() % bird_heights.size()]
+		
+		bird.set_speed(BIRD_SPEED + (difficulty * BIRD_SPEED_MODIFIER))
 		add_obstacle(bird, bird_x, bird_y)
+		
+		# Atur jarak minimal untuk obstacle berikutnya
+		last_obstacle_position = 1  # Misalnya, jarak minimal 1 piksel :D
+	else:
+		# Munculkan obstacle lainnya
+		var obs_type = obstacle_types[randi() % obstacle_types.size()]
+		var max_obs = difficulty + 1
+		var obs_count = randi() % max_obs + 1
+		
+		for i in range(obs_count):
+			var obs = obs_type.instantiate()
+			var obs_sprite = obs.get_node("Sprite2D")
+			var obs_height = obs_sprite.texture.get_height()
+			var obs_scale = obs_sprite.scale
+			
+			var obs_x = base_x + (i * 100)
+			var obs_y = screen_size.y - ground_height - (obs_height * obs_scale.y / 2) + 5
+			
+			add_obstacle(obs, obs_x, obs_y)
+			last_obstacle_position = obs_x
 
 func add_obstacle(obs: Node, x: float, y: float) -> void:
 	if not is_instance_valid(obs) or is_restarting:
@@ -314,3 +336,17 @@ func game_over() -> void:
 	$controller_btn.hide()
 	$game_over.show()
 	get_tree().paused = true
+	play_game_over_sound()
+
+func play_game_over_sound() -> void:
+	var game_over_ins = game_over_scene.instantiate()
+	add_child(game_over_ins)
+	
+	var game_over_sound = game_over_ins.get_node_or_null("game_over_sound")
+	if game_over_sound:
+		game_over_ins.process_mode = Node.PROCESS_MODE_ALWAYS
+		
+		game_over_sound.play()
+		await game_over_sound.finished
+	
+	game_over_ins.queue_free()
